@@ -3,7 +3,6 @@ import axios from "axios";
 import { API_URL } from "../api/api";
 
 /* ================= TYPES ================= */
-
 type Category =
   | "tempered"
   | "backcover"
@@ -13,6 +12,7 @@ type Category =
   | "HandFree"
   | "earphone"
   | "speaker"
+  | "case"
   | "other";
 
 interface Accessory {
@@ -28,12 +28,12 @@ interface Accessory {
 }
 
 /* ================= COMPONENT ================= */
-
 export default function Accessories() {
   const [accessories, setAccessories] = useState<Accessory[]>([]);
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] =
-    useState<Category | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<Category | "all">(
+    "all"
+  );
 
   const [form, setForm] = useState({
     category: "tempered" as Category,
@@ -48,7 +48,6 @@ export default function Accessories() {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   /* ================= FETCH ================= */
-
   const fetchAccessories = async () => {
     try {
       const res = await axios.get(`${API_URL}/accessories`);
@@ -64,7 +63,6 @@ export default function Accessories() {
   }, []);
 
   /* ================= HELPERS ================= */
-
   const resetForm = () => {
     setForm({
       category: "tempered",
@@ -79,7 +77,6 @@ export default function Accessories() {
   };
 
   /* ================= SUBMIT ================= */
-
   const handleSubmit = async () => {
     const { category, item_name, item_number, price, qty_on_hand } = form;
 
@@ -104,7 +101,6 @@ export default function Accessories() {
   };
 
   /* ================= EDIT ================= */
-
   const handleEdit = (a: Accessory) => {
     setForm({
       category: a.category,
@@ -119,27 +115,28 @@ export default function Accessories() {
   };
 
   /* ================= DELETE ================= */
-
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this item?")) return;
+    if (!window.confirm("Delete this item?")) return;
 
     try {
       await axios.delete(`${API_URL}/accessories/${id}`);
-      fetchAccessories();
-    } catch {
-      alert("Failed to delete");
+      // Remove deleted item from UI immediately
+      setAccessories(prev => prev.filter(a => a.id !== id));
+      alert("Accessory deleted");
+    } catch (err: any) {
+      console.error("Delete error:", err.response || err);
+      alert(err.response?.data?.message || "Failed to delete");
     }
   };
 
   /* ================= FILTER ================= */
-
-  const filtered = accessories.filter(a =>
-    a.item_name.toLowerCase().includes(search.toLowerCase()) &&
-    (categoryFilter === "all" || a.category === categoryFilter)
+  const filtered = accessories.filter(
+    a =>
+      a.item_name.toLowerCase().includes(search.toLowerCase()) &&
+      (categoryFilter === "all" || a.category === categoryFilter)
   );
 
   /* ================= UI ================= */
-
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-4">Accessories & Phones</h1>
@@ -196,8 +193,6 @@ export default function Accessories() {
             <option value="speaker">Speaker</option>
             <option value="case">Case</option>
             <option value="other">Other</option>
-
-
           </select>
         </div>
 

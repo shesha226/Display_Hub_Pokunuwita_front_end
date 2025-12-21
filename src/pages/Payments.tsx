@@ -1,345 +1,378 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { API_URL } from "../api/api";
-import html2pdf from "html2pdf.js";
-
-/* ================= INTERFACES ================= */
-interface Payment {
-  id: number;
-  customer_id: number;
-  completed_repair_id?: number | null;
-  order_id?: number | null;
-  amount: number;
-  payment_method: "cash" | "card" | "bank";
-  payment_date: string;
-}
-
-interface Customer {
-  id: number;
-  name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  customer_name: string;
-}
 
 interface Repair {
   id: number;
-  customer_id: number;
+  invoice_number: string | null;
   customer_name: string;
+  phone_model: string;
+  issue: string;
+  repair_cost: number | null;
+  advance: number | null;
+  status: "pending" | "completed";
+}
+
+interface OrderItem {
+  id: number;
+  item_name: string;
+  quantity: number;
+  price: number;
+  discount: number;
+  final_price: number;
 }
 
 interface Order {
   id: number;
-  customer_id: number;
+  invoice_number: string | null;
+  customer_name: string;
+  customer_phone: string;
+  total_amount: number | null;
+  items?: OrderItem[];
+  created_at: string;
 }
 
-/* ================= COMPONENT ================= */
-export default function Payments() {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
+const LIMIT = 5;
+
+export default function RepairTable() {
   const [repairs, setRepairs] = useState<Repair[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [repairSearch, setRepairSearch] = useState("");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [repairPage, setRepairPage] = useState(1);
+  const [orderPage, setOrderPage] = useState(1);
+  const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const [customerId, setCustomerId] = useState("");
-  const [orderId, setOrderId] = useState("");
-  const [repairId, setRepairId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [paymentDate, setPaymentDate] = useState("");
-
-  const printRef = useRef<HTMLDivElement>(null);
-
-  /* ================= FETCH DATA ================= */
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [paymentsRes, customersRes, ordersRes, repairsRes] =
-          await Promise.all([
-            axios.get<Payment[]>(`${API_URL}/payments`),
-            axios.get<{ customers: Customer[] }>(`${API_URL}/customers`),
-            axios.get<{ orders: Order[] }>(`${API_URL}/orders`),
-            axios.get<Repair[]>(`${API_URL}/repair-parts`),
-          ]);
-
-        setPayments(
-          Array.isArray(paymentsRes.data)
-            ? paymentsRes.data.map((p) => ({ ...p, amount: Number(p.amount) }))
-            : []
-        );
-        setCustomers(
-          Array.isArray(customersRes.data.customers)
-            ? customersRes.data.customers
-            : []
-        );
-        setOrders(
-          Array.isArray(ordersRes.data.orders) ? ordersRes.data.orders : []
-        );
-        setRepairs(Array.isArray(repairsRes.data) ? repairsRes.data : []);
-      } catch (err) {
-        console.error(err);
-        alert("Failed to load data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    fetchRepairs();
+    fetchOrders();
   }, []);
 
-  /* ================= FILTER ================= */
-  const filteredPayments = payments.filter((p) => {
-    const customer = customers.find((c) => c.id === p.customer_id);
-    return (customer?.name ?? "").toLowerCase().includes(search.toLowerCase());
-  });
-
-  /* ================= ADD PAYMENT ================= */
-  const handleAddPayment = async (e: React.FormEvent) => {
-  e.preventDefault();
-
-  // ✅ THIS VALIDATION CODE GOES HERE
-  if (!customers.find(c => c.id === Number(customerId))) {
-    alert("Selected customer not found");
-    return;
-  }
-
-  if (orderId) {
-    const order = orders.find(o => o.id === Number(orderId));
-    if (!order || order.customer_id !== Number(customerId)) {
-      alert("Selected order does not belong to selected customer");
-      return;
+  const fetchRepairs = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/repair-parts`);
+      setRepairs(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error(err);
     }
-  }
+  };
 
-  if (repairId) {
-    const repair = repairs.find(r => r.id === Number(repairId));
-    if (!repair || repair.customer_id !== Number(customerId)) {
-      alert("Selected repair does not belong to selected customer");
-      return;
+  const fetchOrders = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/orders`);
+      const ordersData: Order[] = Array.isArray(res.data?.orders)
+        ? res.data.orders
+        : Array.isArray(res.data)
+        ? res.data
+        : [];
+      setOrders(ordersData);
+    } catch (err) {
+      console.error(err);
     }
-  }
+  };
 
-  // 👉 axios.post BELOW THIS
-  try {
-    const payload = {
-      customer_id: Number(customerId),
-      order_id: orderId ? Number(orderId) : null,
-      completed_repair_id: repairId ? Number(repairId) : null,
-      amount: Number(amount),
-      payment_method: paymentMethod,
-      payment_date: paymentDate,
-    };
+  const fetchOrderItems = async (orderId: number) => {
+    try {
+      const res = await axios.get(`${API_URL}/orders/${orderId}`);
+      setSelectedOrder({ ...res.data });
+    } catch (err) {
+      console.error(err);
+      alert("Failed to fetch order items");
+    }
+  };
 
-    await axios.post(`${API_URL}/payments`, payload);
-    alert("Payment added!");
-  } catch (err) {
-    alert("Failed to add payment");
-  }
-};
+  const filteredRepairs = repairs.filter((r) =>
+  r.id.toString().includes(repairSearch) || // search by invoice number
+  `${r.invoice_number} ${r.phone_model} ${r.issue}`
+    .toLowerCase()
+    .includes(repairSearch.toLowerCase())
+);
 
+  const filteredOrders = orders.filter((o) =>
+  o.id.toString().includes(orderSearch) || // search by invoice number
+  `${o.invoice_number} ${o.customer_phone}`
+    .toLowerCase()
+    .includes(orderSearch.toLowerCase())
+);
 
-  /* ================= PRINT ================= */
+  const repairData = filteredRepairs.slice(
+    (repairPage - 1) * LIMIT,
+    repairPage * LIMIT
+  );
+  const orderData = filteredOrders.slice(
+    (orderPage - 1) * LIMIT,
+    orderPage * LIMIT
+  );
+
+  const repairTotalPages = Math.ceil(filteredRepairs.length / LIMIT);
+  const orderTotalPages = Math.ceil(filteredOrders.length / LIMIT);
+
   const handlePrint = () => {
-    if (!printRef.current) return;
-
-    const opt = {
-      margin: 10,
-      filename: `Payment_${selectedPayment?.id}.pdf`,
-      image: { type: "jpeg" as const, quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
-    };
-    html2pdf().set(opt).from(printRef.current).save();
-  };
-
-  /* ================= SEND EMAIL ================= */
-  const handleSendEmail = async () => {
-    if (!selectedPayment || !printRef.current) return;
-
-    const customer = customers.find((c) => c.id === selectedPayment.customer_id);
-    if (!customer?.email) {
-      alert("Customer email not found");
-      return;
+    const printContent = document.getElementById("print-bill");
+    if (!printContent) return;
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Bill</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+              td, th { padding: 8px; border: 1px solid #ccc; }
+              h1, p { margin: 5px 0; }
+              .text-right { text-align: right; }
+              .font-bold { font-weight: bold; }
+            </style>
+          </head>
+          <body>${printContent.innerHTML}</body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
     }
-
-    const opt = {
-      margin: 10,
-      filename: `Payment_${selectedPayment.id}.pdf`,
-      image: { type: "jpeg" as const, quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" as const },
-    };
-
-    const pdfBlob = await html2pdf().set(opt).from(printRef.current).output("blob");
-
-    const formData = new FormData();
-    formData.append("email", customer.email);
-    formData.append("pdf", pdfBlob);
-
-    await axios.post(`${API_URL}/send-payment-receipt`, formData);
-    alert("Receipt sent!");
   };
 
-  if (loading) return <p className="p-6">Loading...</p>;
-
-  /* ================= UI ================= */
   return (
-    <div className="p-6 bg-gray-100 min-h-screen space-y-6">
-      <h1 className="text-3xl font-bold">Payments</h1>
-
-      <input
-        className="border px-3 py-2 rounded w-full sm:w-1/3"
-        placeholder="Search customer..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-
-      <div className="bg-white p-4 rounded shadow my-4">
-        <h2 className="text-xl font-semibold mb-2">Add New Payment</h2>
-        <form onSubmit={handleAddPayment} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <select
-            className="border px-2 py-1 rounded"
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            required
-          >
-            <option value="">Select Customer</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-
-          <select
-            className="border px-2 py-1 rounded"
-            value={orderId}
-            onChange={(e) => setOrderId(e.target.value)}
-          >
-            <option value="">Select Order (optional)</option>
-            {orders.map((o) => {
-              const customer = customers.find((c) => c.id === o.customer_id);
-              return (
-                <option key={o.id} value={o.id}>
-                  {`Order ${o.id} - ${customer?.name || "Unknown"}`}
-                </option>
-              );
-            })}
-          </select>
-
-          <select
-            className="border px-2 py-1 rounded"
-            value={repairId}
-            onChange={(e) => setRepairId(e.target.value)}
-          >
-            <option value="">Select Repair (optional)</option>
-            {repairs.map((r) => (
-              <option key={r.id} value={r.id}>{`Repair ${r.id}`}</option>
-            ))}
-          </select>
-
+    <div className="flex min-h-screen bg-gray-100">
+      {/* LEFT SIDE TABLES */}
+      <div className="flex-1 p-6 space-y-12">
+        {/* Repairs Table */}
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Repairs</h2>
           <input
-            type="number"
-            className="border px-2 py-1 rounded"
-            placeholder="Amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
+            className="border px-3 py-2 rounded w-full mb-3"
+            placeholder="Search repairs..."
+            value={repairSearch}
+            onChange={(e) => {
+              setRepairSearch(e.target.value);
+              setRepairPage(1);
+            }}
           />
+          <table className="w-full bg-white rounded shadow">
+            <thead className="bg-gray-200">
+              <tr>
+                <th className="p-2">Incoice</th>
+                <th className="p-2">Customer</th>
+                <th className="p-2">Phone</th>
+                <th className="p-2">Cost</th>
+                <th className="p-2">Balance</th>
+                <th className="p-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {repairData.map((r) => {
+                const cost = Number(r.repair_cost || 0);
+                const adv = Number(r.advance || 0);
+                return (
+                  <tr key={r.id} className="border-b">
+                    <td className="p-2">{r.invoice_number}</td>
+                    <td className="p-2">{r.customer_name}</td>
+                    <td className="p-2">{r.phone_model}</td>
+                    <td className="p-2">Rs. {cost.toFixed(2)}</td>
+                    <td className="p-2">Rs. {(cost - adv).toFixed(2)}</td>
+                    <td className="p-2">
+                      <button
+                        onClick={() => {
+                          setSelectedRepair(r);
+                          setSelectedOrder(null);
+                        }}
+                        className="bg-blue-500 text-white px-2 py-1 rounded"
+                      >
+                        Bill
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="flex justify-between mt-3">
+            <button
+              disabled={repairPage === 1}
+              onClick={() => setRepairPage((p) => p - 1)}
+              className="px-3 py-1 border rounded disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span>
+              Page {repairPage} / {repairTotalPages || 1}
+            </span>
+            <button
+              disabled={repairPage === repairTotalPages}
+              onClick={() => setRepairPage((p) => p + 1)}
+              className="px-3 py-1 border rounded disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
 
-          <select
-            className="border px-2 py-1 rounded"
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-            required
-          >
-            <option value="">Select Payment Method</option>
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-            <option value="bank">Bank</option>
-          </select>
-
+        {/* Orders Table */}
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Orders</h2>
           <input
-            type="date"
-            className="border px-2 py-1 rounded"
-            value={paymentDate}
-            onChange={(e) => setPaymentDate(e.target.value)}
-            required
+            className="border px-3 py-2 rounded w-full mb-3"
+            placeholder="Search orders..."
+            value={orderSearch}
+            onChange={(e) => {
+              setOrderSearch(e.target.value);
+              setOrderPage(1);
+            }}
           />
-
-          <button
-            type="submit"
-            className="bg-green-500 text-white px-3 py-1 rounded col-span-1 sm:col-span-2"
-          >
-            Add Payment
-          </button>
-        </form>
-      </div>
-
-      <div className="bg-white rounded shadow overflow-x-auto">
-        <table className="min-w-full">
-          <thead className="bg-gray-200">
-            <tr>
-              <th className="p-2">Customer</th>
-              <th className="p-2">Type</th>
-              <th className="p-2">Amount</th>
-              <th className="p-2">Method</th>
-              <th className="p-2">Date</th>
-              <th className="p-2">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPayments.map((p) => {
-              const c = customers.find((x) => x.id === p.customer_id);
-              return (
-                <tr key={p.id} className="border-b">
-                  <td className="p-2">{c?.name}</td>
-                  <td className="p-2">{p.completed_repair_id ? "Repair" : "Order"}</td>
-                  <td className="p-2">Rs. {p.amount.toFixed(2)}</td>
-                  <td className="p-2">{p.payment_method}</td>
-                  <td className="p-2">{new Date(p.payment_date).toLocaleDateString()}</td>
+          <table className="w-full bg-white rounded shadow">
+            <thead className="bg-gray-200">
+              <tr>
+                <th className="p-2">Incoice</th>
+                <th className="p-2">Customer</th>
+                <th className="p-2">Phone</th>
+                <th className="p-2">Total</th>
+                <th className="p-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orderData.map((o) => (
+                <tr key={o.id} className="border-b">
+                  <td className="p-2">{o.invoice_number}</td>
+                  <td className="p-2">{o.customer_name}</td>
+                  <td className="p-2">{o.customer_phone}</td>
+                  <td className="p-2">Rs. {Number(o.total_amount || 0).toFixed(2)}</td>
                   <td className="p-2">
                     <button
-                      onClick={() => setSelectedPayment(p)}
-                      className="bg-blue-500 text-white px-3 py-1 rounded"
+                      onClick={() => {
+                        fetchOrderItems(o.id);
+                        setSelectedRepair(null);
+                      }}
+                      className="bg-green-600 text-white px-2 py-1 rounded"
                     >
-                      View
+                      Bill
                     </button>
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+          <div className="flex justify-between mt-3">
+            <button
+              disabled={orderPage === 1}
+              onClick={() => setOrderPage((p) => p - 1)}
+              className="px-3 py-1 border rounded disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span>
+              Page {orderPage} / {orderTotalPages || 1}
+            </span>
+            <button
+              disabled={orderPage === orderTotalPages}
+              onClick={() => setOrderPage((p) => p + 1)}
+              className="px-3 py-1 border rounded disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
 
-      {selectedPayment && (
-        <div className="fixed inset-0 bg-black/40 flex justify-end z-50">
-          <div className="bg-white w-full sm:w-1/2 p-6">
-            <div ref={printRef} className="space-y-2">
-              <h2 className="text-center text-2xl font-bold">Display Hub Pokunuwita</h2>
-              {(() => {
-                const c = customers.find((x) => x.id === selectedPayment.customer_id);
-                return (
+      {/* Invoice / Bill Popup */}
+      {(selectedRepair || selectedOrder) && (
+        <div className="fixed right-0 top-0 h-full w-[500px] bg-white shadow-2xl z-50 overflow-y-auto">
+          <div className="p-8" id="print-bill">
+            <button
+              onClick={() => {
+                setSelectedRepair(null);
+                setSelectedOrder(null);
+              }}
+              className="text-red-500 font-bold mb-6 flex items-center gap-2"
+            >
+              ✕ Close Preview
+            </button>
+
+            {/* Header */}
+            <div className="flex justify-between items-start mb-8">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">DisplaysHub</h1>
+                <div className="text-gray-500 text-xs mt-1 leading-relaxed">
+                  <p>Pokunuwita, Sri Lanka</p>
+                  <p>+94 7X XXX XXXX</p>
+                  <p>info@displayhub.com</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-400 font-bold tracking-widest uppercase text-[10px]">Mobile Repair Shop</p>
+                <h2 className="text-4xl font-black text-black">INVOICE</h2>
+              </div>
+            </div>
+
+            {/* Customer Info */}
+            <div className="grid grid-cols-2 gap-4 mb-8 border-b border-black pb-6">
+              <div>
+                <h3 className="text-gray-400 font-bold text-xs uppercase mb-1">Bill To</h3>
+                <p className="font-bold text-lg leading-none">{selectedRepair?.customer_name || selectedOrder?.customer_name}</p>
+                <p className="text-gray-600 text-sm mt-1">{selectedRepair?.phone_model || selectedOrder?.customer_phone}</p>
+              </div>
+              <div className="text-right">
+                <h3 className="text-gray-400 font-bold text-xs uppercase mb-1">Date</h3>
+                <p className="text-sm">{new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+
+            {/* Invoice Items Table */}
+            <table className="w-full text-left mb-8 border">
+              <thead>
+                <tr className="bg-gray-200 text-gray-600 text-xs uppercase">
+                  <th className="py-2 px-2 border">Description</th>
+                  <th className="py-2 px-2 border text-right">Quantity</th>
+                  <th className="py-2 px-2 border text-right">Price</th>
+                  <th className="py-2 px-2 border text-right">Discount</th>
+                  <th className="py-2 px-2 border text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {selectedRepair ? (
+                  <tr>
+                    <td className="py-2 px-2 border">Repair: {selectedRepair.issue} ({selectedRepair.phone_model})</td>
+                    <td className="py-2 px-2 border text-right">1</td>
+                    <td className="py-2 px-2 border text-right">Rs. {Number(selectedRepair.repair_cost).toFixed(2)}</td>
+                    <td className="py-2 px-2 border text-right">Rs. {Number(selectedRepair.advance).toFixed(2)}</td>
+                    <td className="py-2 px-2 border text-right">Rs. {(Number(selectedRepair.repair_cost) - Number(selectedRepair.advance)).toFixed(2)}</td>
+                  </tr>
+                ) : selectedOrder && selectedOrder.items ? (
                   <>
-                    <p><b>Name:</b> {c?.name}</p>
-                    <p><b>Phone:</b> {c?.phone}</p>
-                    <p><b>Email:</b> {c?.email}</p>
+                    {selectedOrder.items.map((item, idx) => (
+                      <tr key={idx}>
+                        <td className="py-2 px-2 border">{item.item_name}</td>
+                        <td className="py-2 px-2 border text-right">{item.quantity}</td>
+                        <td className="py-2 px-2 border text-right">Rs. {item.price.toFixed(2)}</td>
+                        <td className="py-2 px-2 border text-right">Rs. {item.discount.toFixed(2)}</td>
+                        <td className="py-2 px-2 border text-right">Rs. {item.final_price.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold text-lg">
+                      <td className="py-2 px-2 border text-right" colSpan={4}>Total</td>
+                      <td className="py-2 px-2 border text-right">Rs. {Number(selectedOrder.total_amount || 0).toFixed(2)}</td>
+                    </tr>
                   </>
-                );
-              })()}
-              <hr />
-              <p><b>Payment Type:</b> {selectedPayment.completed_repair_id ? "Repair" : "Order"}</p>
-              <p><b>Method:</b> {selectedPayment.payment_method}</p>
-              <p><b>Amount:</b> Rs. {selectedPayment.amount.toFixed(2)}</p>
-              <p className="text-center text-sm mt-4">Thank you, come again!</p>
+                ) : null}
+              </tbody>
+            </table>
+
+            {/* Footer */}
+            <div className="mt-12 text-center border-t pt-6">
+              <p className="text-sm font-bold">Thank you for your business!</p>
+              <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">Warranty valid as per shop policy</p>
             </div>
-            <div className="flex gap-2 mt-4">
-              <button onClick={handlePrint} className="bg-green-500 text-white px-4 py-2 rounded">Print</button>
-              <button onClick={handleSendEmail} className="bg-blue-500 text-white px-4 py-2 rounded">Email</button>
-              <button onClick={() => setSelectedPayment(null)} className="bg-gray-500 text-white px-4 py-2 rounded">Close</button>
-            </div>
+
+            {/* Print Button */}
+            <button
+              onClick={handlePrint}
+              className="mt-8 w-full bg-black text-white py-3 rounded-lg font-bold hover:bg-gray-800 transition-colors"
+            >
+              🖨️ Print Official Bill
+            </button>
           </div>
         </div>
       )}

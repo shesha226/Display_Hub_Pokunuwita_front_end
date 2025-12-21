@@ -13,7 +13,7 @@ export default function Login() {
       const res = await axios.post(`${API_URL}/users/login`, { email, password });
       localStorage.setItem("token", res.data.token);
       alert(`Welcome ${res.data.name}`);
-      window.location.href = "/dashboard"; // protected page
+      window.location.href = "/home"; // protected page
     } catch (err: any) {
       setError(err.response?.data?.message || "Login failed");
     }

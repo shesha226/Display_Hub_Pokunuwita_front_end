@@ -13,6 +13,7 @@ interface OrderItem {
 
 interface Order {
   id: number;
+  invoice_number: string; // Added
   customer_name: string;
   customer_phone: string;
   total_amount: number;
@@ -56,7 +57,9 @@ export default function Orders() {
       setFilteredOrders(orders);
     } else {
       const filtered = orders.filter((o) =>
-        o.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
+        (o.customer_name + o.invoice_number)
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase())
       );
       setFilteredOrders(filtered);
     }
@@ -220,7 +223,7 @@ export default function Orders() {
       <div className="mb-4">
         <input
           type="text"
-          placeholder="Search by customer name..."
+          placeholder="Search by customer name or invoice..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="border px-3 py-2 w-full rounded"
@@ -291,6 +294,7 @@ export default function Orders() {
           <thead className="bg-blue-500 text-white">
             <tr>
               <th className="px-4 py-2">ID</th>
+              <th className="px-4 py-2">Invoice</th>
               <th className="px-4 py-2">Customer</th>
               <th className="px-4 py-2">Phone</th>
               <th className="px-4 py-2">Total</th>
@@ -302,6 +306,7 @@ export default function Orders() {
             {currentOrders.map(order => (
               <tr key={order.id} className="border-b hover:bg-gray-100">
                 <td className="px-4 py-2">{order.id}</td>
+                <td className="px-4 py-2">{order.invoice_number}</td>
                 <td className="px-4 py-2">{order.customer_name}</td>
                 <td className="px-4 py-2">{order.customer_phone}</td>
                 <td className="px-4 py-2">Rs. {Number(order.total_amount).toFixed(2)}</td>
