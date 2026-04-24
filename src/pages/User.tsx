@@ -66,7 +66,7 @@ export default function Users() {
         alert("User updated!");
       } else {
         // Create
-        await axios.post(`${API_URL}/users`, { name, email, password });
+        await axios.post(`${API_URL}/users/register`, { name, email, password });
         alert("User added!");
       }
 
