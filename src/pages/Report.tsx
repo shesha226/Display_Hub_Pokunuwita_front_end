@@ -9,12 +9,9 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  Legend,
-  AreaChart,
-  Area
+  Legend
 } from "recharts";
 import {
-  DollarSign,
   ShoppingBag,
   TrendingUp,
   Calendar,
@@ -22,7 +19,9 @@ import {
   AlertCircle,
   Package,
   ArrowUpRight,
-  ChevronRight
+  ChevronRight,
+  Wrench,
+  ShoppingCart
 } from "lucide-react";
 
 interface TopItem {
@@ -34,14 +33,14 @@ interface TopItem {
 
 interface DailyRecord {
   date: string;
-  profit: number;
-  items_sold: number;
-  revenue: number;
+  repair_profit: number;
+  order_profit: number;
 }
 
 interface Report {
+  repair_profit: number;
+  order_profit: number;
   total_profit: number;
-  total_revenue: number;
   total_items_sold: number;
   daily_data: DailyRecord[];
   top_items: TopItem[];
@@ -65,10 +64,10 @@ export default function Reports() {
         params: { range },
       });
 
-      // Backend data sanitize කිරීම
       setReport({
+        repair_profit: Number(res.data.repair_profit) || 0,
+        order_profit: Number(res.data.order_profit) || 0,
         total_profit: Number(res.data.total_profit) || 0,
-        total_revenue: Number(res.data.total_revenue) || 0,
         total_items_sold: Number(res.data.total_items_sold) || 0,
         daily_data: Array.isArray(res.data.daily_data) ? res.data.daily_data : [],
         top_items: Array.isArray(res.data.top_items) ? res.data.top_items : [],
@@ -133,51 +132,57 @@ export default function Reports() {
           <>
             {/* STATS CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-              {/* Revenue */}
-              <div className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden group transition-all hover:shadow-xl hover:-translate-y-1">
-                <div className="relative z-10">
-                  <div className="bg-blue-50 w-12 h-12 rounded-2xl flex items-center justify-center text-blue-600 mb-5 group-hover:scale-110 transition-transform">
-                    <DollarSign size={24} />
-                  </div>
-                  <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Total Revenue</p>
-                  <p className="text-3xl font-black text-slate-900 mt-2">
-                    Rs. {report.total_revenue.toLocaleString()}
-                  </p>
-                </div>
-                <div className="absolute -right-4 -bottom-4 text-slate-50 opacity-50 group-hover:text-blue-50 group-hover:scale-125 transition-all">
-                  <DollarSign size={140} />
-                </div>
-              </div>
-
-              {/* Profit */}
-              <div className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden group transition-all hover:shadow-xl hover:-translate-y-1">
-                <div className="relative z-10">
-                  <div className="bg-emerald-50 w-12 h-12 rounded-2xl flex items-center justify-center text-emerald-600 mb-5 group-hover:scale-110 transition-transform">
-                    <TrendingUp size={24} />
-                  </div>
-                  <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Net Profit</p>
-                  <p className="text-3xl font-black text-emerald-600 mt-2">
-                    Rs. {report.total_profit.toLocaleString()}
-                  </p>
-                </div>
-                <div className="absolute -right-4 -bottom-4 text-slate-50 opacity-50 group-hover:text-emerald-50 group-hover:scale-125 transition-all">
-                  <TrendingUp size={140} />
-                </div>
-              </div>
-
-              {/* Sales */}
+              
+              {/* Sales / Orders Handled */}
               <div className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden group transition-all hover:shadow-xl hover:-translate-y-1">
                 <div className="relative z-10">
                   <div className="bg-indigo-50 w-12 h-12 rounded-2xl flex items-center justify-center text-indigo-600 mb-5 group-hover:scale-110 transition-transform">
                     <Package size={24} />
                   </div>
-                  <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Orders Handled</p>
+                  <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Jobs & Orders</p>
                   <p className="text-3xl font-black text-slate-900 mt-2">
                     {report.total_items_sold}
                   </p>
                 </div>
                 <div className="absolute -right-4 -bottom-4 text-slate-50 opacity-50 group-hover:text-indigo-50 group-hover:scale-125 transition-all">
                   <ShoppingBag size={140} />
+                </div>
+              </div>
+
+              {/* Profit Breakdown */}
+              <div className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden group transition-all hover:shadow-xl hover:-translate-y-1 flex flex-col justify-center">
+                <p className="text-slate-400 text-xs font-black uppercase tracking-widest mb-5">Profit Breakdown</p>
+                <div className="space-y-4 relative z-10">
+                  <div className="flex justify-between items-center bg-blue-50 p-3 rounded-xl">
+                    <div className="flex items-center gap-2 text-blue-700">
+                      <Wrench size={16} />
+                      <span className="text-sm font-bold">Repairs</span>
+                    </div>
+                    <span className="text-sm font-black text-blue-700">Rs. {report.repair_profit.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-indigo-50 p-3 rounded-xl">
+                    <div className="flex items-center gap-2 text-indigo-700">
+                      <ShoppingCart size={16} />
+                      <span className="text-sm font-bold">Orders</span>
+                    </div>
+                    <span className="text-sm font-black text-indigo-700">Rs. {report.order_profit.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Net Profit */}
+              <div className="bg-slate-900 p-7 rounded-[2rem] border border-slate-800 shadow-lg relative overflow-hidden group transition-all hover:shadow-2xl hover:-translate-y-1">
+                <div className="relative z-10">
+                  <div className="bg-emerald-500/20 w-12 h-12 rounded-2xl flex items-center justify-center text-emerald-400 mb-5 group-hover:scale-110 transition-transform">
+                    <TrendingUp size={24} />
+                  </div>
+                  <p className="text-slate-400 text-xs font-black uppercase tracking-widest">Total Net Profit</p>
+                  <p className="text-4xl font-black text-white mt-2">
+                    Rs. {report.total_profit.toLocaleString()}
+                  </p>
+                </div>
+                <div className="absolute -right-4 -bottom-4 text-slate-800 opacity-50 group-hover:text-slate-700 group-hover:scale-125 transition-all">
+                  <TrendingUp size={140} />
                 </div>
               </div>
             </div>
@@ -190,7 +195,7 @@ export default function Reports() {
                 <div className="flex items-center justify-between mb-8">
                   <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                     <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
-                    Income vs Sales Trend
+                    Profit Analysis (Repairs vs Orders)
                   </h2>
                 </div>
                 
@@ -198,12 +203,6 @@ export default function Reports() {
                   {report.daily_data.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={report.daily_data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
-                            <stop offset="95%" stopColor="#10B981" stopOpacity={0.2}/>
-                          </linearGradient>
-                        </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
                         <XAxis 
                           dataKey="date" 
@@ -222,19 +221,23 @@ export default function Reports() {
                           contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '12px'}}
                         />
                         <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{paddingBottom: '20px', fontSize: '12px', fontWeight: 'bold'}} />
+                        
+                        {/* 🔵 Repair Profit Bar */}
                         <Bar 
-                          dataKey="profit" 
-                          name="Profit" 
-                          fill="url(#profitGradient)" 
+                          dataKey="repair_profit" 
+                          name="Repair Profit" 
+                          fill="#3B82F6" 
                           radius={[6, 6, 0, 0]} 
-                          barSize={30}
+                          barSize={20}
                         />
+                        
+                        {/* 🟣 Order Profit Bar */}
                         <Bar 
-                          dataKey="items_sold" 
-                          name="Units Sold" 
+                          dataKey="order_profit" 
+                          name="Order Profit" 
                           fill="#6366F1" 
                           radius={[6, 6, 0, 0]} 
-                          barSize={30}
+                          barSize={20}
                         />
                       </BarChart>
                     </ResponsiveContainer>
@@ -250,8 +253,8 @@ export default function Reports() {
               {/* Top Products */}
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col">
                 <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight mb-8 flex items-center gap-2">
-                  <div className="w-2 h-8 bg-indigo-600 rounded-full"></div>
-                  Top Selling
+                  <div className="w-2 h-8 bg-emerald-500 rounded-full"></div>
+                  Top Moving Items
                 </h2>
 
                 <div className="flex-1 space-y-4">
@@ -278,7 +281,7 @@ export default function Reports() {
                   )}
                 </div>
 
-                <button className="w-full mt-6 py-4 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-[2px] flex items-center justify-center gap-2 hover:bg-blue-600 transition-colors shadow-lg">
+                <button className="w-full mt-6 py-4 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-[2px] flex items-center justify-center gap-2 hover:bg-emerald-500 transition-colors shadow-lg">
                   Full Inventory <ChevronRight size={14} />
                 </button>
               </div>

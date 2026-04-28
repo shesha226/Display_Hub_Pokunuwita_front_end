@@ -1,13 +1,14 @@
 import { Link } from "react-router-dom";
 
 const navbar = [
-    {name:"Customers",path:"/customers"},
+    
   { name: "Orders", path: "/orders" },
     { name: "Accessories", path: "/Accessories" },
     { name: "Repairs", path: "/Repairs" },
     { name: "Payments", path: "/Payments" },
   { name: "Reports", path: "/Reports" },
   { name: "Users", path: "/Users" },
+  {name:"Customers",path:"/customers"},
   
 
   

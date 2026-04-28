@@ -37,7 +37,6 @@ interface Order {
   created_at: string;
 }
 
-// Unified interface for the table
 interface CombinedRecord {
   uniqueKey: string;
   type: 'Repair' | 'Sale';
@@ -66,21 +65,26 @@ export default function UnifiedTransactionTable() {
     try {
       const res = await axios.get(`${API_URL}/repair-parts`);
       setRepairs(Array.isArray(res.data) ? res.data : []);
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("Repair Fetch Error:", err); }
   };
 
   const fetchOrders = async () => {
     try {
       const res = await axios.get(`${API_URL}/orders`);
-      const data = Array.isArray(res.data?.orders) ? res.data.orders : Array.isArray(res.data) ? res.data : [];
-      setOrders(data);
-    } catch (err) { console.error(err); }
+      // 🔥 Backend එකෙන් එන data structure එක හරියටම අල්ලගන්න මෙන්න මේ logic එක දැම්මා
+      let ordersArray = [];
+      if (res.data && res.data.orders && Array.isArray(res.data.orders)) {
+        ordersArray = res.data.orders;
+      } else if (Array.isArray(res.data)) {
+        ordersArray = res.data;
+      }
+      setOrders(ordersArray);
+    } catch (err) { console.error("Order Fetch Error:", err); }
   };
 
   const fetchOrderDetails = async (orderId: number) => {
     try {
       const res = await axios.get(`${API_URL}/orders/${orderId}`);
-      // Update the selected record with full item details
       setSelectedRecord(prev => prev ? {
         ...prev,
         originalData: { ...res.data }
@@ -90,46 +94,39 @@ export default function UnifiedTransactionTable() {
 
   // --- COMBINE AND FILTER LOGIC ---
   const combinedData: CombinedRecord[] = [
-    // 1. Filter completed repairs and map
     ...repairs
       .filter(r => r.status === "completed")
       .map(r => ({
         uniqueKey: `repair-${r.id}`,
         type: 'Repair' as const,
         invoice: r.invoice_number || 'N/A',
-        customer: r.customer_name,
-        contact: r.phone_model,
+        customer: r.customer_name || 'N/A',
+        contact: r.phone_model || 'N/A',
         amount: Number(r.repair_cost || 0) - Number(r.advance || 0),
         originalData: r
       })),
-    // 2. Map sales
     ...orders.map(o => ({
       uniqueKey: `sale-${o.id}`,
       type: 'Sale' as const,
       invoice: o.invoice_number || 'N/A',
-      customer: o.customer_name,
-      contact: o.customer_phone,
+      customer: o.customer_name || 'Walking Customer',
+      contact: o.customer_phone || 'N/A',
       amount: Number(o.total_amount || 0),
       originalData: o
     }))
   ];
 
- // --- COMBINE AND FILTER LOGIC ---
-const filteredData = combinedData.filter(item => {
-  const customer = item.customer?.toLowerCase() ?? "";
-  const invoice = item.invoice?.toLowerCase() ?? "";
-  const contact = item.contact?.toLowerCase() ?? "";
-  const query = searchQuery.toLowerCase();
+  const filteredData = combinedData.filter(item => {
+    const customer = (item.customer || "").toLowerCase();
+    const invoice = (item.invoice || "").toLowerCase();
+    const contact = (item.contact || "").toLowerCase();
+    const query = searchQuery.toLowerCase();
 
-  return (
-    customer.includes(query) ||
-    invoice.includes(query) ||
-    contact.includes(query)
-  );
-});
+    return customer.includes(query) || invoice.includes(query) || contact.includes(query);
+  });
 
   const paginatedData = filteredData.slice((page - 1) * LIMIT, page * LIMIT);
-  const totalPages = Math.ceil(filteredData.length / LIMIT);
+  const totalPages = Math.ceil(filteredData.length / LIMIT) || 1;
 
   const handlePrint = () => {
     const printContent = document.getElementById("print-bill");
@@ -196,10 +193,10 @@ const filteredData = combinedData.filter(item => {
                     {item.contact}
                   </td>
                   <td className="p-4 text-right">
-  <div className="font-black text-gray-900">
-    Rs. {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-  </div>
-</td>
+                    <div className="font-black text-gray-900">
+                      Rs. {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </td>
                   <td className="p-4 text-center">
                     <button 
                       onClick={() => {
@@ -213,10 +210,14 @@ const filteredData = combinedData.filter(item => {
                   </td>
                 </tr>
               ))}
+              {paginatedData.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-10 text-center text-gray-400 font-medium italic">No transactions found.</td>
+                </tr>
+              )}
             </tbody>
           </table>
 
-          {/* Pagination */}
           <div className="p-4 bg-gray-50/50 flex items-center justify-between">
             <p className="text-xs text-gray-500 font-bold">Showing {paginatedData.length} of {filteredData.length} records</p>
             <div className="flex gap-2">
@@ -236,7 +237,6 @@ const filteredData = combinedData.filter(item => {
           </div>
 
           <div className="p-8 flex-1 overflow-y-auto" id="print-bill">
-             {/* Invoice Brand */}
              <div className="flex justify-between items-start mb-10">
                 <div>
                   <h1 className="text-2xl font-black tracking-tighter">DISPLAYSHUB</h1>
@@ -250,7 +250,6 @@ const filteredData = combinedData.filter(item => {
                 </div>
              </div>
 
-             {/* Customer Box */}
              <div className="bg-gray-50 p-4 rounded-xl mb-8 flex justify-between items-center">
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Bill To</p>
@@ -263,7 +262,6 @@ const filteredData = combinedData.filter(item => {
                 </div>
              </div>
 
-             {/* Table */}
              <table className="w-full text-sm mb-8">
                 <thead className="border-b-2 border-gray-900">
                    <tr className="text-[10px] font-black uppercase text-gray-400">
@@ -278,7 +276,7 @@ const filteredData = combinedData.filter(item => {
                            <p className="font-bold">{selectedRecord.originalData.issue}</p>
                            <p className="text-xs text-gray-400">{selectedRecord.originalData.phone_model}</p>
                         </td>
-                        <td className="py-4 text-right font-bold">Rs. {Number(selectedRecord.originalData.repair_cost).toLocaleString()}</td>
+                        <td className="py-4 text-right font-bold">Rs. {Number(selectedRecord.originalData.repair_cost || 0).toLocaleString()}</td>
                      </tr>
                    ) : (
                      selectedRecord.originalData.items?.map((item: any, i: number) => (
@@ -287,24 +285,23 @@ const filteredData = combinedData.filter(item => {
                              <p className="font-bold">{item.item_name}</p>
                              <p className="text-xs text-gray-400">Qty: {item.quantity}</p>
                           </td>
-                          <td className="py-3 text-right font-bold">Rs. {item.final_price.toLocaleString()}</td>
+                          <td className="py-3 text-right font-bold">Rs. {Number(item.final_price || 0).toLocaleString()}</td>
                        </tr>
                      ))
                    )}
                 </tbody>
              </table>
 
-             {/* Calculation */}
              <div className="space-y-2 border-t-2 border-gray-900 pt-4">
                 {selectedRecord.type === 'Repair' && (
                   <div className="flex justify-between text-xs text-emerald-600 font-bold">
                      <span>Advance Paid</span>
-                     <span>- Rs. {Number(selectedRecord.originalData.advance).toLocaleString()}</span>
+                     <span>- Rs. {Number(selectedRecord.originalData.advance || 0).toLocaleString()}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-xl font-black">
                    <span>NET TOTAL</span>
-                   <span>Rs. {selectedRecord.amount.toLocaleString()}</span>
+                   <span>Rs. {selectedRecord.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                 </div>
              </div>
 
